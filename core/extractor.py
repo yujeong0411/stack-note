@@ -24,7 +24,6 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
         - author : 저자
         - date : 발행일
         - content: 본문
-        - word_count: 단어 수
         
         실패 시 None
     """
@@ -69,12 +68,10 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
             "author": metadata.author if metadata else None,
             "date": metadata.date if metadata else None,
             "content": content,
-            "word_count": len(content.split()),
         }
 
         logger.info(f"✅ 추출 완료: {result['title']}")
         logger.debug(f"   도메인: {domain}")
-        logger.debug(f"   단어 수: {result['word_count']}")
 
         return result
     
@@ -178,7 +175,6 @@ if __name__ == "__main__":
             print(f"   저자: {result['author']}")
             print(f"   날짜: {result['date']}")
             print(f"   본문 길이: {len(result['content'])} chars")
-            print(f"   단어 수: {result['word_count']}")
             print(f"\n   본문 미리보기:")
             print(f"   {result['content'][:150]}...")
         else:
