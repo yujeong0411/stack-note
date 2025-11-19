@@ -1,0 +1,544 @@
+/* ============================================
+   Stacknote - Modern UI Stylesheet
+   ============================================ */
+
+/* 전역 변수 - 다크모드 지원 */
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --accent: #ec4899;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-tertiary: #f1f5f9;
+    --bg-hover: #e2e8f0;
+    
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-tertiary: #94a3b8;
+    
+    --border: #e2e8f0;
+    --border-hover: #cbd5e1;
+    
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+}
+
+/* 다크모드 변수 */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-tertiary: #334155;
+        --bg-hover: #475569;
+        
+        --text-primary: #f8fafc;
+        --text-secondary: #cbd5e1;
+        --text-tertiary: #64748b;
+        
+        --border: #334155;
+        --border-hover: #475569;
+    }
+}
+
+/* 전역 스타일 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Streamlit 기본 스타일 오버라이드 */
+.stApp {
+    background: var(--bg-secondary);
+}
+
+/* 헤더 스타일링 */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+h1 {
+    font-size: 1.7rem !important;
+}
+
+h2 {
+    font-size: 1.5rem !important;
+}
+
+h3 {
+    font-size: 1.2rem !important;
+}
+
+/* ============================================
+   카드 컴포넌트
+   ============================================ */
+
+/* 전체 폭을 500px로 제한 */
+.main > div {
+    max-width: 500px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding: 0 12px !important;
+}
+
+.card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+
+
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--primary), var(--secondary));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.card:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.card:hover::before {
+    opacity: 1;
+}
+
+.card b {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.3rem;
+    line-height: 1.3;
+}
+
+.card p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    margin: 0.5rem 0;
+}
+
+.card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    max-width: 100%;
+}
+
+/* 필터 가로 배치 (streamlit 강제 덮어쓰기) */
+[data-testid="stHorizontalBlock"], .filter-row {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+}
+
+/* 오늘 요약(stat) 카드 */
+.card-row {
+    display: flex;
+    gap: 10px;
+}
+/* ============================================
+   태그 스타일
+   ============================================ */
+.tag {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    margin: 0.25rem 0.25rem 0.25rem 0;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.tag:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+/* ============================================
+   브리핑 블록
+   ============================================ */
+.brief-block {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.3s ease;
+}
+
+.brief-block:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+}
+
+.brief-block b {
+    display: block;
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+    font-weight: 700;
+}
+
+/* ============================================
+   버튼 스타일
+   ============================================ */
+.stButton > button {
+    background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: var(--radius-md) !important;
+    padding: 0.75rem 1.5rem !important;
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+    transition: all 0.3s ease !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+.stButton > button:active {
+    transform: translateY(0) !important;
+}
+
+/* ============================================
+   입력 필드
+   ============================================ */
+.stTextInput > div > div > input,
+.stSelectbox > div > div > div,
+.stMultiSelect > div > div > div,
+.stNumberInput > div > div > input,
+.stDateInput > div > div > input {
+    transition: all 0.2s ease !important;
+    background: var(--bg-primary) !important;
+}
+
+.stTextInput > div > div > input:focus,
+.stSelectbox > div > div > div:focus-within,
+.stMultiSelect > div > div > div:focus-within,
+.stNumberInput > div > div > input:focus,
+.stDateInput > div > div > input:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+/* ============================================
+   메트릭 카드
+   ============================================ */
+.stMetric {
+    background: var(--bg-primary);
+    padding: 1.25rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
+}
+
+.stMetric:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+}
+
+.stMetric label {
+    font-size: 0.875rem !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+}
+
+.stMetric [data-testid="stMetricValue"] {
+    font-size: clamp(1rem, 3.5vw, 2rem) !important; 
+    font-weight: 700 !important; 
+    color: var(--primary) !important;
+}
+
+.stMetric label {
+    /* 🚨 수정: 폰트가 너무 작아지지 않도록 clamp 적용 */
+    font-size: clamp(0.5rem, 2vw, 0.875rem) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+}
+/* ============================================
+   프로그레스 바
+   ============================================ */
+.stProgress > div > div {
+    background: var(--bg-tertiary) !important;
+    border-radius: var(--radius-md) !important;
+    overflow: hidden;
+}
+
+.stProgress > div > div > div {
+    background: linear-gradient(90deg, var(--primary), var(--secondary)) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* ============================================
+   탭 스타일
+   ============================================ */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
+    color: white !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    background: var(--bg-hover);
+}
+
+/* ============================================
+   Expander 스타일
+   ============================================ */
+.streamlit-expanderHeader {
+    background: var(--bg-primary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+}
+
+.streamlit-expanderHeader:hover {
+    border-color: var(--primary) !important;
+    background: var(--bg-hover) !important;
+}
+
+.streamlit-expanderContent {
+    border: 1px solid var(--border) !important;
+    border-top: none !important;
+    border-radius: 0 0 var(--radius-md) var(--radius-md) !important;
+    background: var(--bg-primary) !important;
+}
+
+/* ============================================
+   채팅 메시지
+   ============================================ */
+.stChatMessage {
+    background: var(--bg-primary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: 1rem !important;
+    margin-bottom: 1rem !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.stChatMessage[data-testid="user-message"] {
+    border-left: 4px solid var(--primary) !important;
+}
+
+.stChatMessage[data-testid="assistant-message"] {
+    border-left: 4px solid var(--secondary) !important;
+}
+
+/* ============================================
+   스피너/로딩
+   ============================================ */
+.stSpinner > div {
+    border-color: var(--primary) transparent transparent transparent !important;
+}
+
+/* ============================================
+   구분선
+   ============================================ */
+hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 2rem 0;
+}
+
+/* ============================================
+   애니메이션
+   ============================================ */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card, .brief-block, .stMetric {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* ============================================
+   스크롤바 스타일
+   ============================================ */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: var(--radius-md);
+    transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+
+/* ============================================
+   반응형 디자인
+   ============================================ */
+
+/* 타블릿 (481px ~ 768px) - 가로 배치, 간격 축소 */
+@media (min-width: 481px) and (max-width: 768px) {
+    /* Streamlit 컬럼을 가로로 유지 */
+    [data-testid="column"] {
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+        padding: 0 0.25rem !important;
+    }
+    
+    /* 폰트 약간 축소 */
+    body {
+        font-size: 0.95rem;
+    }
+    
+    /* 입력 필드 축소 */
+    .stTextInput input,
+    .stSelectbox select,
+    .stNumberInput input {
+        padding: 0.5rem !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* 카드 패딩 축소 */
+    .card {
+        padding: 1.25rem;
+    }
+}
+
+/* 데스크톱 (769px 이상) - 기본 가로 배치 */
+@media (min-width: 769px) {
+    /* Streamlit 컬럼 가로 정렬 */
+    [data-testid="column"] {
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+    }
+    
+    .row-widget.stHorizontal,
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+    }
+    
+    [data-testid="stHorizontalBlock"] > div {
+        flex-direction: row !important;
+        display: flex !important;
+    }
+    
+    .element-container .stHorizontal,
+    div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 1rem !important;
+    }
+}
+
+/* ============================================
+   필터 가로 배치 (화면 축소 시 크기에 맞춰 줄어듦)
+   ============================================ */
+[data-testid="stHorizontalBlock"] {
+    display: flex !important;
+    flex-wrap: nowrap !important; /* 줄바꿈 방지 */
+    overflow-x: hidden !important; /* 가로 스크롤 완전 방지 */
+}
+
+/* 4개 필터 개별 요소 (컬럼)에 대한 유동적인 폭 설정 */
+[data-testid="stHorizontalBlock"] > div {
+    /* flex: 1 1 0% !important;  */
+    min-width: 0 !important; /* 최소 너비를 0으로 설정하여 최대한 압축 가능하도록 함 */
+    padding: 0 0.25rem !important; /* 내부 패딩은 필요에 따라 조정 */
+}
+
+
+/* ============================================
+   유틸리티 클래스
+   ============================================ */
+.gradient-text {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.glass-effect {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.elevation-1 { box-shadow: var(--shadow-sm); }
+.elevation-2 { box-shadow: var(--shadow-md); }
+.elevation-3 { box-shadow: var(--shadow-lg); }
+.elevation-4 { box-shadow: var(--shadow-xl); }
+

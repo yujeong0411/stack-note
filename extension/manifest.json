@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Stacknote",
+  "version": "1.0",
+  "description": "사용자가 방문한 사이트의 HTML을 자동으로 수집하고 분류 및 요약합니다.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "activeTab",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://localhost:8501/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "48": "icon.png"
+  }
+}

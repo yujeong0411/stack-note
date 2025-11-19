@@ -1,9 +1,9 @@
 """
 웹 콘텐츠 추출 모듈
-Trafilatura를 사용하여 URL에서 보눔ㄴ과 메타데이터 추출
+Trafilatura를 사용하여 URL에서 본문과 메타데이터 추출
 """
 
-from trafilatura import fetch_url, extract, extract_metadata
+from trafilatura import extract, extract_metadata
 from urllib.parse import urlparse
 from utils.logging import logger
 from typing import Optional, Dict, Any
@@ -27,7 +27,7 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
         
         실패 시 None
     """
-    # logger.info(f"콘텐츠 추출 시작: {url}")
+    logger.info(f"콘텐츠 추출 시작: {url}")
 
     try:
         # 기본 추출
@@ -40,7 +40,7 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
                 "Chrome/120.0.0.0 Safari/537.36"
             )
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=40)
         if response.status_code != 200:
             return None
 
@@ -58,7 +58,7 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
         metadata = extract_metadata(html)
 
         # 도메인 추출
-        domain = urlparse(url).netloc
+        domain = detect_source_type(url)
 
         # 결과 구성
         result = {
@@ -70,13 +70,13 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
             "content": content,
         }
 
-        logger.info(f"✅ 추출 완료: {result['title']}")
-        logger.debug(f"   도메인: {domain}")
+        logger.info(f"추출 완료: {result['title']}")
+        logger.debug(f"도메인: {domain}")
 
         return result
     
     except Exception as e:
-        logger.error(f"❌ 추출 실패: {e}")
+        logger.error(f"[ERROR]추출 실패: {e}")
         logger.exception(e)
         return None
     
@@ -145,42 +145,3 @@ def detect_source_type(url: str) -> str:
 
     # --- 기본값: 일반 기사 또는 기타 콘텐츠 ---
     return "article"
-
-# 테스트용
-if __name__ == "__main__":
-    # 테스트 URL
-    test_urls = [
-        "https://trafilatura.readthedocs.io/en/latest/downloads.html"
-    ]
-    
-    print("🧪 Extractor 테스트\n")
-    print("=" * 60)
-    
-    for url in test_urls:
-        print(f"\n📄 테스트: {url}")
-        print("-" * 60)
-        
-        # 소스 타입
-        source_type = detect_source_type(url)
-        print(f"📁 소스 타입: {source_type}")
-        
-        # 콘텐츠 추출
-        result = extract_content(url)
-        
-        if result:
-            print(f"✅ 추출 성공!")
-            print(f"   제목: {result['title']}")
-            print(f"   도메인: {result['domain']}")
-            print(f"   소스 유형: {source_type}")
-            print(f"   저자: {result['author']}")
-            print(f"   날짜: {result['date']}")
-            print(f"   본문 길이: {len(result['content'])} chars")
-            print(f"\n   본문 미리보기:")
-            print(f"   {result['content'][:150]}...")
-        else:
-            print(f"❌ 추출 실패!")
-        
-        print()
-    
-    print("=" * 60)
-    print("테스트 완료!")

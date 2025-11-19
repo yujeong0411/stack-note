@@ -6,13 +6,17 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "apscheduler>=3.11.1",
+    "flask>=3.1.2",
     "langchain>=0.3.27",
     "langchain-chroma>=0.2.6",
     "langchain-upstage>=0.7.4",
     "langgraph>=1.0.1",
     "pydantic>=2.12.4",
+    "pyinstaller>=6.16.0",
     "python-dotenv>=1.2.1",
+    "pywebview>=6.1",
     "requests>=2.32.5",
     "streamlit>=1.51.0",
+    "streamlit-autorefresh>=1.0.1",
     "trafilatura>=2.0.0",
 ]

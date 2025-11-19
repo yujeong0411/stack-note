@@ -4,9 +4,11 @@
 import sqlite3
 import json
 from pathlib import Path
+from datetime import datetime, timedelta
 from config.settings import DB_PATH
 from utils import logger
 from typing import Optional, Dict, List, Any
+from .classifier import classify_content
 
 def init_db():
     """데이터베이스 초기화"""
@@ -64,7 +66,6 @@ def init_db():
         CREATE TABLE IF NOT EXISTS briefing_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            briefing_type TEXT,     -- 'daily', 'weekly'
             period_start DATE,      -- 시작 날짜
             period_end DATE,        -- 종료 날짜
             content TEXT,           -- Markdown 형식
@@ -74,9 +75,6 @@ def init_db():
                          
         CREATE INDEX IF NOT EXISTS idx_briefing_created 
             ON briefing_history(created_at);
-            
-        CREATE INDEX IF NOT EXISTS idx_briefing_type 
-            ON briefing_history(briefing_type);
                     
         -- 사용자 설정 
         CREATE TABLE IF NOT EXISTS user_settings (
@@ -91,8 +89,33 @@ def init_db():
 
     logger.info(f"데이터 베이스 생성 완료: {DB_PATH}")
 
-def save_activity(data: dict) -> int:
-    """활동 저장"""
+def check_existing_activity(url: str) -> Optional[int]:
+    """URL이 DB에 있는지 확인하고 ID 반환"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # 중복 체크
+    cursor.execute(
+        "SELECT id FROM browsing_activity WHERE url = ?",
+        (url,)
+    )
+    existing = cursor.fetchone()
+    conn.close()
+    
+    # 중복 처리
+    if existing:
+        return existing[0] # 기존 Activity ID 반환
+    
+    return None
+
+def save_activity(data: Dict[str, Any]) -> Optional[int]:
+    """
+    활동 저장
+    
+    Returns:
+        int: activity_id (새로 생성 또는 기존 ID)
+        None: 저장 실패
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -112,7 +135,7 @@ def save_activity(data: dict) -> int:
             data.get('content'),
             data.get('summary'),
             data.get('author'),
-            data.get('publish_date'),
+            data.get('date'),
             data.get('category'),
             tags_json,
             data.get('source_type'),
@@ -122,11 +145,18 @@ def save_activity(data: dict) -> int:
         conn.commit()
         activity_id = cursor.lastrowid
 
-        logger.info(f"활동 저장: {data.get('title')} (ID : {activity_id})")
+        logger.info(f"[OK] 저장 완료: ID {activity_id}")
+
         return activity_id
     
+    except sqlite3.IntegrityError as e:
+        logger.error(f"[FAIL] 무결성 에러: {e}")
+        conn.rollback()
+        return None
+    
     except Exception as e:
-        logger.warning(f"⚠️ 중복 URL: {data['url']}")
+        logger.error(f"[FAIL] 저장 실패: {e}")
+        conn.rollback()
         return None
     
     finally:
@@ -135,30 +165,59 @@ def save_activity(data: dict) -> int:
 def get_activities(
         limit: int = 10,
         category: Optional[str] = None,
-        source_type: Optional[str] = None
+        source_type: Optional[str] = None,
+        date: Optional[str] = None,
+        tags: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """활동 조회"""
+    """
+    활동 조회 (필터링 지원)
+    
+    Args:
+        limit: 최대 조회 개수
+        category: 카테고리 필터
+        source_type: 출처 유형 필터
+        date: 시작 날짜 (YYYY-MM-DD)
+        tags: 태그 필터 (리스트, OR 조건)
+    
+    Returns:
+        List[Dict]: 활동 목록
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # 쿼리 구성  -> 좀 더 편하게 뒤를 붙이기 위해 참인 조건 1=1 넣음, 뒤에 띄어쓰기!!
-    query = "SELECT * FROM browsing_activity WHERE 1=1 "
+    query = "SELECT * FROM browsing_activity WHERE 1=1"
     params = []
 
     if category:
-        query += "AND category = ?"
+        query += " AND category = ?"
         params.append(category)
 
     if source_type:
-        query += "AND source_type = ?"
+        query += " AND source_type = ?"
         params.append(source_type)
+    
+    if date:
+        query += " AND DATE(created_at) = ?"
+        params.append(date)
 
-    query += "ORDER BY created_at DESC LIMIT ?"
+    if tags and len(tags) > 0:
+        tag_conditions = []
+        for tag in tags:
+            tag_clean = tag.lstrip('#')  # # 제거
+            tag_conditions.append("tags LIKE ?")
+            params.append(f'%"{tag_clean}"%')
+
+        query += " AND (" + " OR ".join(tag_conditions) + ")"
+
+    query += " ORDER BY created_at DESC LIMIT ?"
     params.append(limit)
+    
+    logger.debug(f"쿼리: {query}")
+    logger.debug(f"파라미터: {params}")
 
     cursor.execute(query, params)
-    rows = cursor.fetchall()    # 결과 가져오기
+    rows = cursor.fetchall()
     conn.close()
 
     # dict 변환 + json 파싱 
@@ -167,12 +226,14 @@ def get_activities(
         activity = dict(row)
         activity['tags'] = json.loads(activity['tags']) if activity['tags'] else []
         activity['metadata'] = json.loads(activity['metadata']) if activity['metadata'] else {}
+        activity['created_at'] = activity['created_at'][:10]
+
         activities.append(activity)
 
+    logger.info(f"활동 조회: {len(activities)}개 (필터: 카테고리={category}, 날짜={date}, 태그={tags})")
     return activities
 
 def save_briefing(
-    briefing_type: str,
     period_start: str,
     period_end: str,
     content: str,
@@ -184,18 +245,19 @@ def save_briefing(
     cursor = conn.cursor()
 
     metadata_json = json.dumps(metadata or {}, ensure_ascii=False)
-
-    cursor.execute("""
-        INSERT INTO briefing_history
-        (briefing_type, period_start, period_end, content, activity_count, metadata)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (briefing_type, period_start, period_end, content, activity_count, metadata_json))
-    
+    try:
+        cursor.execute("""
+            INSERT INTO briefing_history
+            (period_start, period_end, content, activity_count, metadata)
+            VALUES (?, ?, ?, ?, ?)
+        """, (period_start, period_end, content, activity_count, metadata_json))
+    except Exception as e:
+        logger.error(f"브리핑 저장 실패: {e}")
     conn.commit()
     briefing_id = cursor.lastrowid
     conn.close()
     
-    logger.info(f"브리핑 저장: {briefing_type} (ID: {briefing_id})")
+    logger.info(f"브리핑 저장: (ID: {briefing_id})")
     return briefing_id
 
 def get_briefings(limit: int = 10) -> List[Dict[str, Any]]:
@@ -205,7 +267,8 @@ def get_briefings(limit: int = 10) -> List[Dict[str, Any]]:
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT * FROM briefing_history
+        SELECT * 
+        FROM briefing_history
         ORDER BY created_at DESC
         LIMIT ?
     """, (limit,))
@@ -221,34 +284,64 @@ def get_briefings(limit: int = 10) -> List[Dict[str, Any]]:
 
     return briefings
 
-def get_setting(key: str, default: Any = None) -> Any:
+def get_activities_for_briefing(days: int=7) -> List[Dict[str, Any]]:
+    """
+    브리핑 생성을 위해 최근 활동 데이터 조회
+    """
+    start_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # created_at이 start_date 이후인 활동만 조회
+    cursor.execute("""
+        SELECT *
+        FROM browsing_activity
+        WHERE created_at >= ?
+        ORDER BY created_at DESC
+    """, (start_date,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    activities = []
+    for row in rows:
+        activity = dict(row)
+        # 시간 정보를 제거하고 날짜만 남깁니다.
+        activity['created_at'] = activity['created_at'].split(' ')[0] 
+        activities.append(activity)
+
+    return activities
+
+def get_setting() -> list:
     """설정 조회"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cursor.execute("SELECT value FROM user_settings WHERE key = ?", (key,))
+    cursor.execute("SELECT value FROM user_settings WHERE key = 'user_topics'")
     row = cursor.fetchone()
     conn.close()
     
     if row:
-        return row[0]
-    return default
+        return json.loads(row[0])
+    return []
 
 
-def set_setting(key: str, value: Any):
+def set_setting(topics: list):
     """설정 저장"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute("""
         INSERT OR REPLACE INTO user_settings (key, value, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-    """, (key, str(value)))
+        VALUES ('user_topics', ?, CURRENT_TIMESTAMP)
+    """, (json.dumps(topics)))
     
     conn.commit()
     conn.close()
     
-    logger.debug(f"⚙️ 설정 저장: {key} = {value}")
+    logger.debug(f"⚙️ 설정 저장: {topics}")
 
 def search_by_keyword(keyword: str, limit: int = 10) -> List[Dict[str, Any]]:
     """키워드로 활동 검색 (제목, 본문, 태그, 카테고리)"""
@@ -379,17 +472,35 @@ def delete_activity(activity_id: int) -> bool:
         conn.close()
         return False
     
-def get_categories() -> List[str]:
-    """모든 카테고리 반환"""
+def get_categories(date: Optional[str] = None) -> List[str]:
+    """카테고리 목록 조회
+    
+    Args:
+        date: 날짜 (None이면 전체 기간)
+    
+    Returns:
+        List[str]: 카테고리 목록
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT DISTINCT category
-        FROM browsing_activity
-        WHERE category IS NOT NULL
-        ORDER BY category
-    """)
+    if date:
+        # 특정 날짜의 카테고리만
+        cursor.execute("""
+            SELECT DISTINCT category
+            FROM browsing_activity
+            WHERE category IS NOT NULL
+              AND DATE(created_at) = ?
+            ORDER BY category
+        """, (date,))
+
+    else:
+        cursor.execute("""
+            SELECT DISTINCT category
+            FROM browsing_activity
+            WHERE category IS NOT NULL
+            ORDER BY category
+        """)
 
     rows = cursor.fetchall()
     conn.close()
@@ -397,100 +508,172 @@ def get_categories() -> List[str]:
     categories = [row[0] for row in rows]
     return categories
 
-def get_stats() -> Dict[str, Any]:
-    """통계 정보"""
+def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: int = 100) -> List[str]:
+    """
+    태그 목록만 조회 (최적화됨)
+    - content, metadata 등 불필요한 컬럼 제외
+    - tags 컬럼만 SELECT
+
+    Args:
+        date: 날짜 (None이면 전체 기간)
+        category: 카테고리 필터 (None이면 전체)
+        limit: 개수
+    
+    Returns:
+        List[str]: 태그 목록
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # 총 활동수
-    cursor.execute("SELECT COUNT(*) FROM browsing_activity")
-    total = cursor.fetchone()[0]
+    query = "SELECT tags FROM browsing_activity WHERE tags IS NOT NULL"
+    params = []
+    
+    # 날짜 필터
+    if date:
+        query += " AND DATE(created_at) = ?"
+        params.append(date)
+    
+    # 카테고리 필터 추가
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+    
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
 
-    # 총 카테고리수 
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+
+    all_tags = set()
+    for row in rows:
+        try:
+            tags_list = json.loads(row[0])
+            if isinstance(tags_list, list):
+                all_tags.update(tags_list)
+        except (json.JSONDecodeError, TypeError):
+            continue
+    tags = sorted(list(all_tags))
+    logger.debug(
+        f"태그 조회: {len(tags)}개 "
+        f"(날짜={date or '전체'}, 카테고리={category or '전체'})"
+    )
+    return tags
+
+def get_activity_metrics() -> Dict[str, Any]:
+    """오늘의 활동 통계 (총 개수, 최다 카테고리, 카테고리 분포) 조회"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    today = datetime.now().date().isoformat()
+    last_seven_days = (datetime.now() - timedelta(days=7)).isoformat()
+
+    # 오늘 총 활동수
+    cursor.execute("SELECT COUNT(id) FROM browsing_activity WHERE DATE(created_at) = ?", (today,))
+    total_count_today = cursor.fetchone()[0]
+
+    # 오늘 최다 카테고리
     cursor.execute("""
-        SELECT category, COUNT(*) as count
+        SELECT category, COUNT(category) as count
         FROM browsing_activity
-        WHERE category IS NOT NULL
+        WHERE DATE(created_at) = ? AND category IS NOT NULL
         GROUP BY category
         ORDER BY count DESC
-    """)
-    categories = {row[0]: row[1] for row in cursor.fetchall()}
+    """, (today,))
+    top_category_row = cursor.fetchone()
+    top_category = top_category_row[0] if top_category_row else "N/A"
 
-    # 소스 타입 별 수 
+    # 오늘 최다 태그
     cursor.execute("""
-        SELECT source_type, COUNT(*) as count
-        FROM browsing_activity
-        WHERE source_type IS NOT NULL
-        GROUP BY source_type
+        SELECT tags 
+        FROM browsing_activity 
+        WHERE created_at >= ? AND tags IS NOT NULL
+    """, (today,))
+    tags_today = cursor.fetchall()
+
+    all_tags = []
+    for row in tags_today:
+        try:
+            tags_list = json.loads(row[0])
+            all_tags.extend(tags_list)
+        except:
+            pass
+
+    from collections import Counter
+    tag_counts = Counter(all_tags)
+    top_tag = f"#{tag_counts.most_common(1)[0][0]}" if tag_counts else "N/A"
+
+    # 4. 카테고리 분포 (최근 7일 기준)
+    cursor.execute("""
+        SELECT category, COUNT(category) as count 
+        FROM browsing_activity 
+        WHERE created_at >= ? AND category IS NOT NULL
+        GROUP BY category 
         ORDER BY count DESC
-    """)
-    source_types = {row[0]: row[1] for row in cursor.fetchall()}
+        LIMIT 5
+    """, (last_seven_days,))
+    
+    category_rows = cursor.fetchall()
+    total_activities_7d = sum([row[1] for row in category_rows])
+
+    category_distribution = []
+    for category, count in category_rows:
+        percent = (count / total_activities_7d * 100) if total_activities_7d else 0
+        category_distribution.append({
+            "name": category,
+            "count": count,
+            "percent": round(percent)
+        })
 
     conn.close()
 
     return {
-        'total': total,
-        'categories': categories,
-        'source_types': source_types
+        "total_count_today": total_count_today,
+        "top_category": top_category,
+        "top_tag": top_tag,
+        "category_distribution": category_distribution
     }
 
-if __name__ == "__main__":
-    print("🧪 Storage 테스트\n")
-    print("=" * 60)
+def save_activity_with_ai(data: dict) -> int:
+    """
+    활동 저장 + AI 분류
     
-    # 1. DB 초기화
-    print("\n1️⃣ 데이터베이스 초기화...")
-    init_db()
+    Args:
+        data: {
+            'url': str,
+            'domain': str,
+            'title': str,
+            'content': str,
+            'author': str (optional),
+            'publish_date': str (optional)
+        }
+        
+    Returns:
+        activity_id
+    """
+    logger.info(f"활동 저장 (AI 분류 포함): {data.get('title')}")
+
+    # AI 분류
+    if data.get('content'):
+        logger.info("   🤖 AI 분류 중...")
+        ai_result = classify_content(
+            data['title'],
+            data['content']
+        )
+        
+        # AI 결과 추가
+        data['category'] = ai_result['category']
+        data['tags'] = ai_result['tags']
+        data['summary'] = ai_result['summary']
+        
+        logger.info(f"분류 완료: {ai_result['category']}")
+    else:
+        # AI 분류 실패 시 기본값
+        data['category'] = 'Uncategorized'
+        data['tags'] = []
+        data['summary'] = data.get('title', 'No summary')
     
-    # 2. 활동 저장 테스트
-    print("\n2️⃣ 활동 저장 테스트...")
-    test_activity = {
-        'url': 'https://example.com/test-article',
-        'domain': 'example.com',
-        'title': '테스트 아티클',
-        'content': '이것은 테스트 내용입니다. ' * 50,
-        'summary': '테스트 요약문입니다.',
-        'author': 'Test Author',
-        'publish_date': '2025-11-13',
-        'category': 'Test',
-        'tags': ['test', 'example', 'demo'],
-        'source_type': 'blog',
-        'metadata': {'lang': 'ko', 'difficulty': 'easy'}
-    }
+    logger.info(f"save_activity에 줄 data : {data}")
     
-    activity_id = save_activity(test_activity)
-    print(f"   저장 완료: ID {activity_id}")
-    
-    # 3. 활동 조회 테스트
-    print("\n3️⃣ 활동 조회 테스트...")
-    activities = get_activities(limit=5)
-    print(f"   조회된 활동: {len(activities)}개")
-    for act in activities:
-        print(f"   - {act['title']} ({act['category']}) - {len(act['tags'])} tags")
-    
-    # 4. 브리핑 저장 테스트
-    print("\n4️⃣ 브리핑 저장 테스트...")
-    briefing_id = save_briefing(
-        briefing_type='daily',
-        period_start='2025-11-13',
-        period_end='2025-11-13',
-        content='# 오늘의 요약\n\n- 1개 문서 저장\n- 주제: Test',
-        activity_count=1,
-        metadata={'total_words': 1000}
-    )
-    print(f"   브리핑 저장: ID {briefing_id}")
-    
-    # 5. 설정 테스트
-    print("\n5️⃣ 설정 테스트...")
-    set_setting('theme', 'dark')
-    set_setting('language', 'ko')
-    
-    theme = get_setting('theme')
-    language = get_setting('language')
-    print(f"   theme: {theme}")
-    print(f"   language: {language}")
-    
-    # 완료
-    print("\n" + "=" * 60)
-    print("✅ 모든 테스트 완료!")
-    print(f"📁 DB 위치: {DB_PATH}")
+    return save_activity(data)
+

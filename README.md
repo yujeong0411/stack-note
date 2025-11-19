@@ -1,8 +1,8 @@
 # 📚 Stacknote
 
-> AI organizes. You retrieve.
+> AI가 정리합니다. 당신은 검색만 하세요.
 
-AI-powered personal knowledge base that automatically organizes, summarizes, and indexes everything you read online.
+온라인에서 읽은 모든 콘텐츠를 자동으로 정리, 요약, 인덱싱하는 AI 기반 개인 지식 저장소입니다. 복잡한 수동 정리 없이, AI가 학습 패턴을 분석하고 지식을 체계화합니다.
 
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
@@ -10,28 +10,121 @@ AI-powered personal knowledge base that automatically organizes, summarizes, and
 
 ---
 
-## ✨ Features
+## ✨ 주요 기능 (Features)
 
-- 🤖 **Automatic Categorization** - AI analyzes content and creates topic-based categories
-- 📝 **Smart Summaries** - Get 3-5 line summaries with relevant tags
-- 🔍 **Semantic Search** - Find content by meaning, not just keywords
-- 💬 **AI Chat Interface** - Ask questions about your saved content
-- 📊 **Activity Dashboard** - Visualize your learning patterns
-- 🔒 **Privacy-First** - Local content extraction with minimal external API calls
+Stacknote는 다음 핵심 기능을 통해 지식 관리를 자동화합니다.
+- 🔗 **자동 URL 수집 및 비동기 처리** - API 엔드포인트를 통해 URL을 수집하고, **백그라운드 큐 시스템**에서 콘텐츠 추출 및 분석을 비동기로 처리하여 사용자 경험을 최적화합니다.
+- 🤖 **자동 카테고리 분류(Automatic Categorization)** - AI가 콘텐츠를 분석하여 주제별로 카테고리를 자동 생성하고 정리합니다.
+- 📝 **스마트 요약 및 태그(Smart Summaries)** - 3~5줄의 핵심 요약과 관련 태그를 자동으로 생성하여 빠른 내용을 파악할 수 있습니다.
+- 🔍 **의미론적 검색(Semantic Search)** - 단순히 키워드가 아닌, 내용의 의미를 기반으로 저장된 자료를 찾아줍니다.
+- 💬 **개인화된 AI 에이전트 (AI Chat Interface)** - 저장된 콘텐츠와 활동 기록을 기반으로 질문에 답변하며 지식을 탐색할 수 있는 **지식 기반 대화형 에이전트**를 제공합니다.
+- 📊 **활동 대시보드 및 브리핑(Activity Dashboard)** - 학습 패턴을 시각화하고, **APScheduler**를 활용하여 주기적으로 **자동 브리핑**을 제공하거나 사용자가 원하는 시점에 **수동 브리핑**을 요청하여 주요 동향을 분석합니다.
+- 🔒 **프라이버시(Privacy-First)** - 콘텐츠 추출, 데이터베이스(SQLite), 및 벡터 저장소(ChromaDB)는 **모두 로컬 환경**에서 이루어지며, 개인 정보 보호를 최우선으로 설계되었습니다.
 
 ---
 
-## 🚀 Quick Start
+## 🗺️ 아키텍쳐
 
-### Prerequisites
 
-- Python 3.10 or higher
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
+```mermaid
+graph TD
+    subgraph User Interaction
+        U["User"] -- "1. Interacts With" --> UI["Streamlit Frontend"]
+        UI -- "2. Sends Queries" --> ChatInput["Agent Chat Interface"]
+    end
 
-### Installation
+    subgraph Backend Services
+        API["FastAPI Ingestion API"] -- "3. Receives URLs" --> URL_Queue["URL Queue"]
+        UI -- "4. Displays Data" --> Storage["SQLite Database"]
+    end
+
+    subgraph Background Processing
+        Consumer["Queue Consumer"] -- "5. Processes URLs" --> Collector["Web Content Collector"]
+        Collector -- "7. Analyzes & Saves" --> Classifier["LLM Content Classifier"]
+        Classifier -- "8. Saves Metadata" --> Storage
+        Collector -- "9. Embeds & Stores" --> VectorStore["ChromaDB Vector Store"]
+
+        Scheduler["Task Scheduler (APScheduler)"] -- "10. Triggers Briefing" --> BriefingJob["Auto Briefing Job"]
+    end
+
+    subgraph AI Agent System
+        Agent["Master Agent (Upstage LLM)"] -- "11. Orchestrates" --> Agent_Tools["Functional Tools"]
+        Agent_Tools -- "A. Vector Search" --> VectorStore
+        Agent_Tools -- "B. Data Access" --> Storage
+    end
+
+    ChatInput -- "12. Sends Query" --> Agent
+    BriefingJob -- "13. Requests Analysis" --> Agent
+    Agent -- "14. Returns Response" --> UI
+
+```
+
+---
+
+## 🛠️ 기술 스택 (Tech Stack)
+
+### Core
+- **[LangGraph](https://github.com/langchain-ai/langgraph)** - AI workflow orchestration
+- **[Upstage API](https://www.upstage.ai/)** - LLM for categorization and summarization
+- **[ChromaDB](https://www.trychroma.com/)** - Vector database for semantic search
+- **[Trafilatura](https://trafilatura.readthedocs.io/)** - Content extraction
+
+### Backend & Infrastructure
+- **SQLite** - Metadata storage
+- **APScheduler** - Background jobs (e.g., auto-briefing)
+- **Requests / httpx** - HTTP client for API communication
+- **NumPy & Pandas** - Data manipulation for vector operations and analysis
+
+### Frontend & API
+- **[Streamlit](https://streamlit.io/)** - Primary Web UI for the dashboard and chat interface
+- **Flask (via API.py)** - Lightweight API endpoint for URL ingestion
+
+---
+
+## 📂 프로젝트 구조 (Project Structure)
+```
+stacknote/
+├── app.py                # Streamlit main application
+├── api.py                # Flask-based API server
+├── run_desktop.py        # Desktop launcher script
+├── run_desktop.spec      # PyInstaller configuration spec for building the executable
+├── core/                 # Core functionality
+│   ├── extractor.py      # Content extraction
+│   ├── agent.py          # AI agent workflow
+│   ├── classifier.py     # Content classification & summarization
+│   ├── url_collector.py  # Background URL collection
+│   ├── vector_store.py   # Vector database management
+│   └── storage.py        # Metadata storage management
+├── config/               # Configuration
+│   └── settings.py       # Settings and constants
+├── utils/                # Utilities
+│   ├── ui.py             # UI layout components
+│   └── logging.py        # Logging setup
+├── extension/            # Browser extension source code
+│   ├── icon.png      # AI agent workflow
+│   ├── background.js     # Background script for sending URLs to the API
+│   ├── manifest.json.    # Extension manifest configuration
+│   ├── popup.html        # Extension popup UI
+│   └── popup.js          # Extension popup logic
+├── data/                 # Data directory (gitignored)
+│   ├── chroma/           # ChromaDB storage
+│   └── stacknote.db      # SQLite database
+└── logs/                 # Logs (gitignored)
+```
+
+---
+
+## 🚀 시작하기 (Quick Start)
+
+### 1. 사전 요구 사항 (Prerequisites)
+
+- Python 3.10 이상
+- uv 또는 pip (종속성 관리를 위해 uv 권장)
+
+### 2. 설치 및 환경 설정 (Installation & Setup)
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/stacknote.git
+git clone https://github.com/yujeong0411/stack-note.git
 cd stacknote
 
 # Install dependencies
@@ -42,17 +135,7 @@ cp .env.example .env
 # Edit .env and add your UPSTAGE_API_KEY
 ```
 
-### Configuration
-
-Create a `.env` file in the root directory:
-```env
-UPSTAGE_API_KEY=your-api-key-here
-DEV_MODE=true
-```
-
-Get your Upstage API key from [Upstage Console](https://console.upstage.ai).
-
-### Run
+### 4. 실행 (Run)
 ```bash
 # Using uv
 uv run streamlit run app.py
@@ -61,133 +144,19 @@ uv run streamlit run app.py
 python -m streamlit run app.py
 ```
 
-Visit `http://localhost:8501` in your browser.
-
----
-
-## 🛠️ Tech Stack
-
-### Core
-- **[LangGraph](https://github.com/langchain-ai/langgraph)** - AI workflow orchestration
-- **[Upstage Solar](https://www.upstage.ai/)** - LLM for categorization and summarization
-- **[ChromaDB](https://www.trychroma.com/)** - Vector database for semantic search
-- **[Trafilatura](https://trafilatura.readthedocs.io/)** - Content extraction
-
-### Framework
-- **[Streamlit](https://streamlit.io/)** - Web UI
-- **SQLite** - Metadata storage
-- **APScheduler** - Background jobs
-
----
-
-## 📖 Usage
-
-### 1. Save Content
-```
-1. Paste a URL in the input field
-2. Click "Process"
-3. AI automatically extracts, categorizes, and summarizes
-```
-
-### 2. Search
-```
-- Use natural language: "LangGraph multi-agent examples"
-- Filter by category, date, or tags
-- Sort by relevance or date
-```
-
-### 3. Chat with AI
-```
-"What did I learn about RAG this week?"
-"Show me all FastAPI tutorials"
-"Summarize today's activities"
-```
-
----
-
-## 📂 Project Structure
-```
-stacknote/
-├── app.py              # Streamlit main application
-├── core/               # Core functionality
-│   ├── extractor.py    # Content extraction
-│   ├── agent.py        # AI agent workflow
-│   └── storage.py      # Database management
-├── config/             # Configuration
-│   └── settings.py     # Settings and constants
-├── utils/              # Utilities
-│   └── logging.py      # Logging setup
-├── pages/              # Streamlit pages
-├── data/               # Data directory (gitignored)
-│   ├── chroma/         # ChromaDB storage
-│   └── stacknote.db    # SQLite database
-└── logs/               # Logs (gitignored)
-```
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1: MVP (2 weeks) ✅ In Progress
-- [x] Project setup
-- [ ] Content extraction (Trafilatura)
-- [ ] AI categorization and summarization
-- [ ] Vector search (ChromaDB)
-- [ ] Streamlit UI (Home, Search, Chat)
-- [ ] Daily briefing system
-
-### Phase 2: Desktop App (Future)
-- [ ] Electron wrapper
-- [ ] Native desktop experience
-- [ ] Offline support
-- [ ] Advanced analytics
-
-### Phase 3: Advanced Features (Future)
-- [ ] Browser extension
-- [ ] Mobile app
-- [ ] Team collaboration
-- [ ] API for integrations
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Setup
-```bash
-# Install development dependencies
-uv sync --all-extras
-
-# Run tests
-uv run pytest
-
-# Format code
-uv run black .
-
-# Lint
-uv run ruff check .
-```
-
----
-
-## 📊 Performance
-
-- URL Processing: < 10 seconds
-- Search: < 1 second
-- Memory Usage: < 1GB
+브라우저에서 http://localhost:8501로 접속합니다.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 LICENSE 파일을 참조하세요.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [LangChain](https://github.com/langchain-ai/langchain) for the amazing AI framework
+- [LangGraph](https://github.com/langchain-ai/langgraph) for the amazing AI framework
 - [Upstage](https://www.upstage.ai/) for the Solar LLM API
 - [Streamlit](https://streamlit.io/) for the rapid UI development
 
@@ -195,17 +164,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📧 Contact
 
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Email: your.email@example.com
+- GitHub: [@yujeong0411](https://github.com/yujeong0411)
+- Email: choiyujeong0411@gmail.com
 
 ---
 
-## ⭐ Star History
-
-If you find this project useful, please consider giving it a star!
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/stacknote&type=Date)](https://star-history.com/#yourusername/stacknote&Date)
-
----
-
-**Built with ❤️ by [Your Name](https://github.com/yourusername)**
+**Built with ❤️ by [choi yujeong](https://github.com/yujeong0411)**
