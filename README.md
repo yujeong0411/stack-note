@@ -101,7 +101,7 @@ stacknote/
 │   ├── ui.py             # UI layout components
 │   └── logging.py        # Logging setup
 ├── extension/            # Browser extension source code
-│   ├── icon.png      # AI agent workflow
+│   ├── icon.png      
 │   ├── background.js     # Background script for sending URLs to the API
 │   ├── manifest.json.    # Extension manifest configuration
 │   ├── popup.html        # Extension popup UI
