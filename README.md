@@ -28,34 +28,66 @@ Stacknote는 다음 핵심 기능을 통해 지식 관리를 자동화합니다.
 
 ```mermaid
 graph TD
-    subgraph User Interaction
-        U["User"] -- "1. Interacts With" --> UI["Streamlit Frontend"]
-        UI -- "2. Sends Queries" --> ChatInput["Agent Chat Interface"]
+    %% 스타일 정의
+    classDef user fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#000;
+    classDef ui fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000;
+    classDef backend fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#000;
+    classDef ai fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
+    classDef db fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#000;
+
+    subgraph User_Entry ["User Entry Points"]
+        U["User"]:::user
+        Ext["Browser Extension"]:::user
     end
 
-    subgraph Backend Services
-        API["FastAPI Ingestion API"] -- "3. Receives URLs" --> URL_Queue["URL Queue"]
-        UI -- "4. Displays Data" --> Storage["SQLite Database"]
+    subgraph Frontend ["Frontend Interface"]
+        UI["Streamlit App<br/>(Dashboard & Chat)"]:::ui
     end
 
-    subgraph Background Processing
-        Consumer["Queue Consumer"] -- "5. Processes URLs" --> Collector["Web Content Collector"]
-        Collector -- "7. Analyzes & Saves" --> Classifier["LLM Content Classifier"]
-        Classifier -- "8. Saves Metadata" --> Storage
-        Collector -- "9. Embeds & Stores" --> VectorStore["ChromaDB Vector Store"]
-
-        Scheduler["Task Scheduler (APScheduler)"] -- "10. Triggers Briefing" --> BriefingJob["Auto Briefing Job"]
+    subgraph Backend_System ["Local Backend Services"]
+        API["Flask API Server<br/>(api.py)"]:::backend
+        Queue["URL Job Queue"]:::backend
+        Consumer["Queue Consumer<br/>(Background Thread)"]:::backend
+        
+        subgraph Core_Logic ["Core Processing"]
+            Collector["Content Extractor<br/>(Trafilatura)"]:::backend
+            Classifier["Classifier & Summarizer<br/>(Upstage LLM)"]:::backend
+            Scheduler["APScheduler<br/>(Auto Briefing)"]:::backend
+        end
     end
 
-    subgraph AI Agent System
-        Agent["Master Agent (Upstage LLM)"] -- "11. Orchestrates" --> Agent_Tools["Functional Tools"]
-        Agent_Tools -- "A. Vector Search" --> VectorStore
-        Agent_Tools -- "B. Data Access" --> Storage
+    subgraph Data_Storage ["Local Storage"]
+        SQLite[("SQLite DB<br/>(Metadata)")]:::db
+        Chroma[("ChromaDB<br/>(Vector Store)")]:::db
     end
 
-    ChatInput -- "12. Sends Query" --> Agent
-    BriefingJob -- "13. Requests Analysis" --> Agent
-    Agent -- "14. Returns Response" --> UI
+    subgraph AI_Engine ["AI Agent System"]
+        Agent["Master Agent<br/>(LangGraph + Upstage)"]:::ai
+        Tools["Functional Tools<br/>(Retriever, SQL Tool)"]:::ai
+    end
+
+    %% 흐름 연결
+    U -->|"1. Views & Chats"| UI
+    Ext -->|"2. Sends Current URL"| API
+    
+    UI -->|"3. Chat Query"| Agent
+    
+    API -->|"4. Enqueues URL"| Queue
+    Queue -->|"5. Consumes"| Consumer
+    Consumer -->|"6. Extracts"| Collector
+    Collector -->|"7. Classifies"| Classifier
+    
+    Classifier -->|"8. Saves Meta"| SQLite
+    Collector -->|"9. Embeds"| Chroma
+    
+    Scheduler -->|"10. Triggers Job"| Agent
+    
+    %% Agent & Tools 흐름 수정 (중요)
+    Agent -->|"11. Invokes"| Tools
+    Tools -.->|"12. Semantic Search"| Chroma
+    Tools -.->|"13. Data Query"| SQLite
+    
+    Agent -.->|"14. Final Response"| UI
 
 ```
 
