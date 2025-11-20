@@ -95,21 +95,34 @@ graph TD
 
 ## 🛠️ 기술 스택 (Tech Stack)
 
-### Core
-- **[LangGraph](https://github.com/langchain-ai/langgraph)** - AI workflow orchestration
-- **[Upstage API](https://www.upstage.ai/)** - LLM for categorization and summarization
-- **[ChromaDB](https://www.trychroma.com/)** - Vector database for semantic search
-- **[Trafilatura](https://trafilatura.readthedocs.io/)** - Content extraction
+### 🧠 Core AI & Logic
+| 기술 | 설명 |    |
+|------|------|------|
+| **Python** | 메인 프로그래밍 언어 | ![](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) |
+| **LangGraph** | AI 에이전트 워크플로우 오케스트레이션 | ![](https://img.shields.io/badge/LangGraph-Agent%20Orchestration-blue) |
+| **Upstage Solar** | 콘텐츠 분류, 요약, 에이전트 대화를 위한 LLM | ![](https://img.shields.io/badge/Upstage-SOLAR-blueviolet) |
+| **Trafilatura** | 고성능 웹 콘텐츠 추출 | ![](https://img.shields.io/badge/Trafilatura-Web%20Scraper-lightgrey) |
 
-### Backend & Infrastructure
-- **SQLite** - Metadata storage
-- **APScheduler** - Background jobs (e.g., auto-briefing)
-- **Requests / httpx** - HTTP client for API communication
-- **NumPy & Pandas** - Data manipulation for vector operations and analysis
+### 🗄️ Data & Storage
+| 기술 | 설명 |    |
+|------|------|------|
+| **ChromaDB** | 의미론적 검색을 위한 벡터 데이터베이스 | ![](https://img.shields.io/badge/ChromaDB-Vector%20DB-orange) |
+| **SQLite** | 메타데이터(URL, 카테고리 등) 저장 | ![](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white) |
 
-### Frontend & API
-- **[Streamlit](https://streamlit.io/)** - Primary Web UI for the dashboard and chat interface
-- **Flask (via API.py)** - Lightweight API endpoint for URL ingestion
+### 💻 Frontend & Application
+| 기술 | 설명 |    |
+|------|------|------|
+| **Streamlit** | 대시보드 및 채팅 인터페이스용 웹 UI | ![](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white) |
+| **Flask** | URL 수집을 위한 백그라운드 API 서버 | ![](https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=white) |
+| **Browser Extension** | URL 수집을 위한 브라우저 확장 프로그램 (JS/HTML) | ![](https://img.shields.io/badge/Extension-Chrome%20Add--on-lightgrey) |
+
+
+### ⚙️ DevOps & Infrastructure
+| 기술 | 설명 |    |
+|------|------|------|
+| **PyInstaller** | 데스크톱용 단일 실행 파일 패키징 | ![](https://img.shields.io/badge/PyInstaller-Build-lightgrey) |
+| **APScheduler** | 자동 브리핑 등 백그라운드 작업 스케줄링 | ![](https://img.shields.io/badge/APScheduler-Scheduler-green) |
+
 
 ---
 
