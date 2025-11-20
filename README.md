@@ -8,6 +8,8 @@
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+![preview](./docs/stack-note-preview.gif)
+
 ---
 
 ## ✨ 주요 기능 (Features)
