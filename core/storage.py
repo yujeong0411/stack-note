@@ -3,7 +3,6 @@
 """
 import sqlite3
 import json
-from pathlib import Path
 from datetime import datetime, timedelta
 from config.settings import DB_PATH
 from utils import logger
@@ -30,11 +29,7 @@ def init_db():
             -- URL 정보
             url TEXT NOT NULL UNIQUE,
             domain TEXT,
-                         
-            -- 메타데이터 
-            author TEXT,
-            publish_date TEXT,
-                         
+                                       
             -- content
             title TEXT,
             content TEXT,  -- 전체 본문
@@ -125,7 +120,7 @@ def save_activity(data: Dict[str, Any]) -> Optional[int]:
     try:
         cursor.execute("""
             INSERT INTO browsing_activity 
-               (url, domain, title, content, summary, author, publish_date,
+               (url, domain, title, content, summary,
                 category, tags, source_type, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -134,8 +129,6 @@ def save_activity(data: Dict[str, Any]) -> Optional[int]:
             data.get('title'),
             data.get('content'),
             data.get('summary'),
-            data.get('author'),
-            data.get('date'),
             data.get('category'),
             tags_json,
             data.get('source_type'),
@@ -163,24 +156,34 @@ def save_activity(data: Dict[str, Any]) -> Optional[int]:
         conn.close()
 
 def get_activities(
-        limit: int = 10,
+        page: int =1,
+        page_size: int = 10,
         category: Optional[str] = None,
         source_type: Optional[str] = None,
-        date: Optional[str] = None,
+        start_date: Optional[str] = None,  
+        end_date: Optional[str] = None,    
         tags: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
     """
     활동 조회 (필터링 지원)
     
     Args:
-        limit: 최대 조회 개수
+        page: ,
+        page_size: ,
         category: 카테고리 필터
         source_type: 출처 유형 필터
-        date: 시작 날짜 (YYYY-MM-DD)
+        start_date: 시작 날짜 (YYYY-MM-DD)
+        end_date : 종료 날짜 
         tags: 태그 필터 (리스트, OR 조건)
     
     Returns:
-        List[Dict]: 활동 목록
+        {
+            'total': int,
+            'page': int,
+            'page_size': int,
+            'total_pages': int,
+            'items': List[Dict]
+        }
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -197,9 +200,18 @@ def get_activities(
         query += " AND source_type = ?"
         params.append(source_type)
     
-    if date:
-        query += " AND DATE(created_at) = ?"
-        params.append(date)
+    if start_date and end_date:
+        # 둘 다 있으면: BETWEEN
+        query += " AND DATE(created_at) BETWEEN ? AND ?"
+        params.extend([start_date, end_date])
+    elif start_date:
+        # 시작일만: 그날 이후
+        query += " AND DATE(created_at) >= ?"
+        params.extend(start_date)
+    elif end_date:
+        # 종료일만: 그 날 이전
+        query += " AND DATE(created_at) <= ?"
+        params.append(end_date)
 
     if tags and len(tags) > 0:
         tag_conditions = []
@@ -210,14 +222,26 @@ def get_activities(
 
         query += " AND (" + " OR ".join(tag_conditions) + ")"
 
-    query += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
-    
+    # 정렬
+    query += " ORDER BY created_at DESC"
+
+    # 페이지네이션
+    offset = (page -1) * page_size
+    paginated_query = query + " LIMIT ? OFFSET ?"
+    paginated_params = params + [page_size, offset]
+
     logger.debug(f"쿼리: {query}")
     logger.debug(f"파라미터: {params}")
-
-    cursor.execute(query, params)
+    
+    # 데이터 조회
+    cursor.execute(paginated_query, paginated_params)
     rows = cursor.fetchall()
+
+    # 전체 개수 조회
+    count_query = query.replace("SELECT *", "SELECT COUNT(*)")
+    cursor.execute(count_query, params)
+    total = cursor.fetchone()[0]
+
     conn.close()
 
     # dict 변환 + json 파싱 
@@ -230,8 +254,14 @@ def get_activities(
 
         activities.append(activity)
 
-    logger.info(f"활동 조회: {len(activities)}개 (필터: 카테고리={category}, 날짜={date}, 태그={tags})")
-    return activities
+    logger.info(f"활동 조회: {len(activities)}개 (필터: 카테고리={category}, 날짜={start_date}~{end_date}, 태그={tags})")
+    return {
+        'total': total,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': (total + page_size - 1) // page_size,  # 올림 계산
+        'items': activities
+    }
 
 def save_briefing(
     period_start: str,
@@ -437,16 +467,17 @@ def update_activity(activity_id: int, data: dict) -> bool:
         if cursor.rowcount > 0:
             logger.info(f"활동 업데이트: ID {activity_id}")
             conn.close()
-            return True
+            updated = get_activity_by_id(activity_id)
+            return updated
         else:
             logger.warning(f"활동 없음: ID {activity_id}")
             conn.close()
-            return False
+            return None
             
     except Exception as e:
         logger.error(f"업데이트 실패: {e}")
         conn.close()
-        return False
+        return None
     
 
 def delete_activity(activity_id: int) -> bool:
@@ -487,7 +518,7 @@ def get_categories(date: Optional[str] = None) -> List[str]:
     if date:
         # 특정 날짜의 카테고리만
         cursor.execute("""
-            SELECT DISTINCT category
+            SELECT DISTINCT category, COUNT(*) as count
             FROM browsing_activity
             WHERE category IS NOT NULL
               AND DATE(created_at) = ?
@@ -496,7 +527,7 @@ def get_categories(date: Optional[str] = None) -> List[str]:
 
     else:
         cursor.execute("""
-            SELECT DISTINCT category
+            SELECT DISTINCT category, COUNT(*) as count
             FROM browsing_activity
             WHERE category IS NOT NULL
             ORDER BY category
@@ -505,7 +536,7 @@ def get_categories(date: Optional[str] = None) -> List[str]:
     rows = cursor.fetchall()
     conn.close()
 
-    categories = [row[0] for row in rows]
+    categories = [{"name": row[0], "count": row[1]} for row in rows]
     return categories
 
 def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: int = 100) -> List[str]:
@@ -538,8 +569,8 @@ def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: 
         query += " AND category = ?"
         params.append(category)
     
-    query += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
+    # query += " ORDER BY created_at DESC LIMIT ?"
+    # params.append(limit)
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
@@ -555,10 +586,10 @@ def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: 
             continue
     tags = sorted(list(all_tags))
     logger.debug(
-        f"태그 조회: {len(tags)}개 "
+        f"태그 조회: {len(tags[:limit])}개 "
         f"(날짜={date or '전체'}, 카테고리={category or '전체'})"
     )
-    return tags
+    return tags[:limit]
 
 def get_activity_metrics() -> Dict[str, Any]:
     """오늘의 활동 통계 (총 개수, 최다 카테고리, 카테고리 분포) 조회"""
@@ -643,9 +674,7 @@ def save_activity_with_ai(data: dict) -> int:
             'url': str,
             'domain': str,
             'title': str,
-            'content': str,
-            'author': str (optional),
-            'publish_date': str (optional)
+            'content': str
         }
         
     Returns:

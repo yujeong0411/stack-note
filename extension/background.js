@@ -27,7 +27,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       sentTabs[tabKey] = true;
 
       // Streamlit 앱으로 자동 전송
-      fetch('http://localhost:8502/api/add-url', {
+      fetch('http://localhost:8000/api/add-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

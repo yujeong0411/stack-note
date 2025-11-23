@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "apscheduler>=3.11.1",
+    "fastapi>=0.121.3",
     "flask>=3.1.2",
     "langchain>=0.3.27",
     "langchain-chroma>=0.2.6",
@@ -19,4 +20,5 @@ dependencies = [
     "streamlit>=1.51.0",
     "streamlit-autorefresh>=1.0.1",
     "trafilatura>=2.0.0",
+    "uvicorn>=0.38.0",
 ]

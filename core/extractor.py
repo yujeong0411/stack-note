@@ -21,8 +21,6 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
         - url : URL
         - domain: 도메인
         - title : 제목
-        - author : 저자
-        - date : 발행일
         - content: 본문
         
         실패 시 None
@@ -65,8 +63,6 @@ def extract_content(url: str) -> Optional[Dict[str, Any]]:
             "url": url,
             "domain": domain,
             "title": metadata.title if metadata else None,
-            "author": metadata.author if metadata else None,
-            "date": metadata.date if metadata else None,
             "content": content,
         }
 

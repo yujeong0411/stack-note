@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Any, Annotated, Sequence
 from typing_extensions import TypedDict
 from datetime import datetime, timedelta
+from collections import Counter
 from langchain_core.tools import tool
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
@@ -63,6 +64,16 @@ def generate_briefing_tool(days: int=7) -> str:
     """
     # 데이터 조회
     activities = get_activities_for_briefing(days=days)
+
+    # metadata 계산
+    categories = [a['category'] for a in activities]
+    category_counts = Counter(categories)
+    top_categories = [cat for cat, _ in category_counts.most_common(3)]
+
+    metadata = {
+        "days": days,
+        "top_categories": top_categories
+    }
 
     period_end = datetime.now().date().isoformat()
     period_start = (datetime.now() - timedelta(days=days)).date().isoformat()
@@ -142,7 +153,7 @@ def generate_briefing_tool(days: int=7) -> str:
         period_end=period_end, 
         content=briefing_text, 
         activity_count=len(activities), 
-        metadata={"days": days}
+        metadata=metadata
     )
 
     # Agent에게 최종 텍스트 반환
