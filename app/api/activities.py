@@ -55,9 +55,14 @@ def get_activityy_endpoint(activity_id: int):
 
 @router.post("/", status_code=status.HTTP_202_ACCEPTED)
 async def create_activity_endpoint(data: ActivityCreate, background_tasks: BackgroundTasks):
-    """URL 제출 및 활동 생성 (백그라운드 처리)"""
-    # 백그라운드 처리
+    """
+    URL 제출 및 활동 생성 (백그라운드 처리)
+    브라우저 확장에서 호출
+    """
+    # 벡터스토어 초기화
     vectorstore = init_vectorstore()
+
+    # 백그라운드 처리
     background_tasks.add_task(
         process_url_auto,
         str(data.url),
@@ -65,6 +70,7 @@ async def create_activity_endpoint(data: ActivityCreate, background_tasks: Backg
     )
 
     return success_response(
+        data={"url": str(data.url)},
         message="URL이 처리 대기열에 추가되었습니다"
     )
 

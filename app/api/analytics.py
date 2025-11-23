@@ -2,6 +2,7 @@ from fastapi import APIRouter, status, HTTPException
 from typing import Optional
 from core.storage import get_categories, get_tags
 from app.utils.responses import success_response
+from core.storage import get_activity_metrics
 
 router = APIRouter()
 
@@ -26,4 +27,14 @@ def list_tags(category: Optional[str] = None, limit: int = 100):
     return success_response(
         data={"tags": tags},
         message="태그 목록 조회 성공"
+    )
+
+@router.get("/metrics", status_code=status.HTTP_200_OK)
+def get_metrics():
+    """오늘의 활동 통계"""    
+    metrics = get_activity_metrics()
+    
+    return success_response(
+        data=metrics,
+        message="통계 조회 성공"
     )

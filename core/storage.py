@@ -222,26 +222,22 @@ def get_activities(
 
         query += " AND (" + " OR ".join(tag_conditions) + ")"
 
-    # 정렬
-    query += " ORDER BY created_at DESC"
-
-    # 페이지네이션
-    offset = (page -1) * page_size
-    paginated_query = query + " LIMIT ? OFFSET ?"
-    paginated_params = params + [page_size, offset]
-
-    logger.debug(f"쿼리: {query}")
-    logger.debug(f"파라미터: {params}")
-    
-    # 데이터 조회
-    cursor.execute(paginated_query, paginated_params)
-    rows = cursor.fetchall()
-
     # 전체 개수 조회
     count_query = query.replace("SELECT *", "SELECT COUNT(*)")
     cursor.execute(count_query, params)
     total = cursor.fetchone()[0]
 
+    # 페이지네이션
+    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.append(page_size)
+    params.append((page - 1) * page_size)
+
+    logger.debug(f"쿼리: {query}")
+    logger.debug(f"파라미터: {params}")
+    
+    # 데이터 조회
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
     conn.close()
 
     # dict 변환 + json 파싱 
@@ -251,16 +247,20 @@ def get_activities(
         activity['tags'] = json.loads(activity['tags']) if activity['tags'] else []
         activity['metadata'] = json.loads(activity['metadata']) if activity['metadata'] else {}
         activity['created_at'] = activity['created_at'][:10]
-
         activities.append(activity)
 
-    logger.info(f"활동 조회: {len(activities)}개 (필터: 카테고리={category}, 날짜={start_date}~{end_date}, 태그={tags})")
+    logger.info(
+        f"활동 조회: {len(activities)}개 "
+        f"(페이지: {page}/{(total + page_size - 1) // page_size}, "
+        f"필터: 카테고리={category}, 날짜={start_date}~{end_date}, 태그={tags})"
+    )
+
     return {
-        'total': total,
-        'page': page,
-        'page_size': page_size,
-        'total_pages': (total + page_size - 1) // page_size,  # 올림 계산
-        'items': activities
+        "items": activities,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total + page_size - 1) // page_size
     }
 
 def save_briefing(
@@ -536,7 +536,7 @@ def get_categories(date: Optional[str] = None) -> List[str]:
     rows = cursor.fetchall()
     conn.close()
 
-    categories = [{"name": row[0], "count": row[1]} for row in rows]
+    categories = [{"category": row[0], "count": row[1]} for row in rows]
     return categories
 
 def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: int = 100) -> List[str]:
@@ -651,7 +651,7 @@ def get_activity_metrics() -> Dict[str, Any]:
     for category, count in category_rows:
         percent = (count / total_activities_7d * 100) if total_activities_7d else 0
         category_distribution.append({
-            "name": category,
+            "category": category,
             "count": count,
             "percent": round(percent)
         })

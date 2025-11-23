@@ -26,8 +26,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       // 전송 기록 추가
       sentTabs[tabKey] = true;
 
-      // Streamlit 앱으로 자동 전송
-      fetch('http://localhost:8000/api/add-url', {
+      // FastAPI 서버로 전송
+      fetch('http://localhost:8000/api/activities/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -44,10 +44,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
               type: 'basic',
               iconUrl: 'icon.png',
               title: 'Stacknote 💾',
-              message: `저장됨: ${data.category}`
+              message: `처리 중 : ${tab.title}`
             });
           }
-          console.log("data 저장됨")
+          console.log("URL 제출 완료:", data)
         })
         .catch(error => {
           // Streamlit 앱이 안 켜져있으면 무시
