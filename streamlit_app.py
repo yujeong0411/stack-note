@@ -1,16 +1,16 @@
 # uv run streamlit run app.py로 로컬 실행 
+
 import requests
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 import streamlit as st
 from datetime import datetime
-from threading import Thread
 from apscheduler.schedulers.background import BackgroundScheduler
 from streamlit_autorefresh import st_autorefresh
 from utils.logging import logger
 from utils.ui import load_css, render_card, render_briefing_block
 from core.vector_store import init_vectorstore 
 from core.storage import init_db
-from core.agent import create_agent_graph, run_agent, set_agent_resource
+from core.agent import create_agent_graph, set_agent_resource
 
 EXTERNAL_LOGO_URL = "https://res.cloudinary.com/dofrfwdqh/image/upload/v1763444959/stacknote_logo.png"
 
@@ -85,16 +85,19 @@ class APIClient:
         try:
             response = requests.get(f"{API_BASE_URL}/analytics/categories", params=params)
             result = APIClient._handle_response(response)
-            print(result)
             return result.get("data", {}).get("categories", []) if result else []
         except Exception as e:
             logger.error(f"카테고리 조회 실패: {e}")
             return []
         
     @staticmethod
-    def get_tags(category: Optional[str] = None, limit: int = 100) -> List[str]:
+    def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: int = 100) -> List[str]:
         """태그 목록 조회"""
         params = {"limit": limit}
+
+        if date:
+            params["date"] = date
+
         if category and category != "전체":
             params["category"] = category
         
@@ -205,13 +208,15 @@ def get_categories_cached(date_str):
     return APIClient.get_categories(date=date_str)
 
 @st.cache_data(ttl=300)  
-def get_tags_cached(category: str = None):
+def get_tags_cached(date_str: str = None, category: str = None):
     """UI용 태그 목록 (긴 캐싱)
     
     Args:
+        date_str: None 또는 YYYY-MM-DD 형식의 문자열
         category: None 또는 카테고리 문자열
     """
     return APIClient.get_tags(
+        date=date_str,
         category=category,  
         limit=100
     )
@@ -251,8 +256,15 @@ def get_activities_cached(
     )
 
     if result and result.get("isSuccess"):
-        return result.get("data", {}).get("items", [])
-    return []
+        data = result.get("data", {})
+        return {
+            "items": data.get("items", []),
+            "total": data.get("total", 0),
+            "total_pages": data.get("total_pages", 1),
+            "page": data.get("page", 1)
+        }
+    
+    return {"items": [], "total": 0, "total_pages": 1, "page": 1}
 
 @st.cache_data(ttl=60)  # 1분
 def get_metrics_cached():
@@ -301,26 +313,20 @@ def render_feed_tab():
     st.divider()
 
     # 활동 목록 헤더
-    col_title, col_reset, col_refresh = st.columns([4, 3, 3])
+    col_title, col_reset= st.columns([6, 4])
     
     with col_title:
         st.markdown("### 📝 활동 목록")
     
     with col_reset:
         # 필터 초기화 버튼
-        if st.button("초기화", key="reset_filters", help="모든 필터 초기화"):
+        if st.button("초기화", key="reset_filters"):
             # Session state 초기화
             st.cache_data.clear()  
-            st.session_state.date_filter = None
+            st.session_state.date_filter = datetime.now().date()
             st.session_state.category_filter = "전체"
             st.session_state.tag_filter = []
             st.session_state.limit_filter
-            st.rerun()
-
-    with col_refresh:
-        # 새로고침 버튼 
-        if st.button("refresh"):
-            st.cache_data.clear()
             st.rerun()
 
     col1, col2 = st.columns(2)
@@ -329,7 +335,7 @@ def render_feed_tab():
     with col1:
         selected_date = st.date_input(
             "날짜",
-            value=None,
+            value=datetime.now().date(),
             max_value=datetime.now().date(),
             key="date_filter"
         )
@@ -337,10 +343,13 @@ def render_feed_tab():
     # 날짜 기준 카테고리, 태그 로드
     date_str = selected_date.isoformat() if selected_date else None
     categories = get_categories_cached(date_str) 
+    
+    # 카테고리 추출
+    category_names = [cat["category"] for cat in categories]
 
     # 카테고리 선택
     with col2:
-        category_options = ["전체"] + categories
+        category_options = ["전체"] + category_names
         category_filter = st.selectbox(
             "카테고리",
             category_options,
@@ -352,6 +361,7 @@ def render_feed_tab():
     # 태그 선택 (날짜 + 카테고리 필터링)
     with col3:
         all_tags = get_tags_cached(
+            date_str=date_str,
             category=None if category_filter == "전체" else category_filter 
         )
         
@@ -362,28 +372,33 @@ def render_feed_tab():
         )
     
     with col4:
-        limit = st.number_input(
-            "개수",
+        page_size = st.number_input(
+            "페이지당 개수",
             min_value=5,
-            max_value=50,
-            value=10,
+            max_value=10,
+            value=5,
             step=5,
-            key="limit_filter"
+            key="page_size_filter"
         )
 
     # 페이지네이션
-    page = st.session_state.get('current_page', 1)
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 1
 
     # 데이터 로드
     tags_tuple = tuple(tag_filter) if tag_filter else () 
-    activities = get_activities_cached(
-        page=page,
-        page_size=limit,
+    result = get_activities_cached(
+        page=st.session_state.current_page,
+        page_size=page_size,
         date_str=date_str, 
         category=category_filter, 
         tags_tuple=tags_tuple
     )
-    
+
+    activities = result["items"]
+    total = result["total"]
+    total_pages = result["total_pages"]
+        
     # 간단한 필터 요약
     filter_summary_col1, filter_summary_col2 = st.columns([8, 2])
     
@@ -415,6 +430,59 @@ def render_feed_tab():
                 summary=item['summary'],
                 tags=item['tags']
             )
+        
+        # 페이지네이션 버튼
+        st.markdown("---")
+
+        # 페이지 번호 생성 (최대 7개 표시)
+        current = st.session_state.current_page
+
+        # 표시할 페이지 범위 계산
+        if total_pages <= 7:
+            page_range = range(1, total_pages + 1)
+        else:
+            if current <= 4:
+                page_range = list(range(1, 6)) + ['...', total_pages]
+            elif current >= total_pages - 3:
+                page_range = [1, '...'] + list(range(total_pages - 4, total_pages + 1))
+            else:
+                page_range = [1, '...'] + list(range(current - 1, current + 2)) + ['...', total_pages]
+        
+        # 페이지네이션 버튼 렌더링
+        cols = st.columns([1] + [1] * len(page_range) + [1])
+        
+        # 이전 버튼
+        with cols[0]:
+            if st.button("◀", disabled=(current == 1), key="prev_page"):
+                st.session_state.current_page -= 1
+                st.rerun()
+        
+        # 페이지 번호 버튼
+        for idx, page_num in enumerate(page_range, start=1):
+            with cols[idx]:
+                if page_num == '...':
+                    st.markdown("<p style='text-align:center'>...</p>", unsafe_allow_html=True)
+                else:
+                    is_current = (page_num == current)
+                    button_type = "primary" if is_current else "secondary"
+                    if st.button(
+                        str(page_num), 
+                        key=f"page_{page_num}",
+                        disabled=is_current,
+                        type=button_type,
+                        use_container_width=True
+                    ):
+                        st.session_state.current_page = page_num
+                        st.rerun()
+        
+        # 다음 버튼
+        with cols[-1]:
+            if st.button("▶", disabled=(current == total_pages), key="next_page"):
+                st.session_state.current_page += 1
+                st.rerun()
+        
+        # 페이지 정보 표시
+        st.caption(f"총 {total}개 항목 중 {(current-1)*page_size + 1}~{min(current*page_size, total)}번째 표시")
     else:
         st.info("💡 조건에 맞는 활동이 없습니다.")
 

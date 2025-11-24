@@ -16,8 +16,8 @@ def list_categories_endpoint(date: Optional[str] = None):
     )
 
 @router.get("/tags", status_code=status.HTTP_200_OK)
-def list_tags(category: Optional[str] = None, limit: int = 100):
-    tags = get_tags(category=category, limit=limit)
+def list_tags(date: Optional[str] = None, category: Optional[str] = None, limit: int = 100):
+    tags = get_tags(date=date, category=category, limit=limit)
     if not tags:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

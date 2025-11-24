@@ -182,7 +182,8 @@ def get_activities(
             'page': int,
             'page_size': int,
             'total_pages': int,
-            'items': List[Dict]
+            'items': List[Dict],
+            'total_pages': int
         }
     """
     conn = sqlite3.connect(DB_PATH)
@@ -207,7 +208,7 @@ def get_activities(
     elif start_date:
         # 시작일만: 그날 이후
         query += " AND DATE(created_at) >= ?"
-        params.extend(start_date)
+        params.append(start_date)
     elif end_date:
         # 종료일만: 그 날 이전
         query += " AND DATE(created_at) <= ?"
@@ -522,7 +523,8 @@ def get_categories(date: Optional[str] = None) -> List[str]:
             FROM browsing_activity
             WHERE category IS NOT NULL
               AND DATE(created_at) = ?
-            ORDER BY category
+            GROUP BY category
+            ORDER BY count DESC, category
         """, (date,))
 
     else:
@@ -530,13 +532,14 @@ def get_categories(date: Optional[str] = None) -> List[str]:
             SELECT DISTINCT category, COUNT(*) as count
             FROM browsing_activity
             WHERE category IS NOT NULL
-            ORDER BY category
+            GROUP BY category
+            ORDER BY count DESC, category
         """)
 
     rows = cursor.fetchall()
     conn.close()
-
     categories = [{"category": row[0], "count": row[1]} for row in rows]
+
     return categories
 
 def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: int = 100) -> List[str]:
@@ -569,8 +572,8 @@ def get_tags(date: Optional[str] = None, category: Optional[str] = None, limit: 
         query += " AND category = ?"
         params.append(category)
     
-    # query += " ORDER BY created_at DESC LIMIT ?"
-    # params.append(limit)
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
@@ -597,7 +600,6 @@ def get_activity_metrics() -> Dict[str, Any]:
     cursor = conn.cursor()
 
     today = datetime.now().date().isoformat()
-    last_seven_days = (datetime.now() - timedelta(days=7)).isoformat()
 
     # 오늘 총 활동수
     cursor.execute("SELECT COUNT(id) FROM browsing_activity WHERE DATE(created_at) = ?", (today,))
@@ -642,7 +644,7 @@ def get_activity_metrics() -> Dict[str, Any]:
         GROUP BY category 
         ORDER BY count DESC
         LIMIT 5
-    """, (last_seven_days,))
+    """, (today,))
     
     category_rows = cursor.fetchall()
     total_activities_7d = sum([row[1] for row in category_rows])
