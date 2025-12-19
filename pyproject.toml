@@ -9,6 +9,7 @@ dependencies = [
     "flask>=3.1.2",
     "langchain>=0.3.27",
     "langchain-chroma>=0.2.6",
+    "langchain-openai>=0.3.35",
     "langchain-upstage>=0.7.4",
     "langgraph>=1.0.1",
     "pydantic>=2.12.4",

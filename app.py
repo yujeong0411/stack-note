@@ -146,14 +146,14 @@ def render_feed_tab():
     st.divider()
 
     # 활동 목록 헤더
-    col_title, col_reset, col_refresh = st.columns([4, 3, 3])
+    col_title, col_reset = st.columns([8, 2])
     
     with col_title:
         st.markdown("### 📝 활동 목록")
     
     with col_reset:
         # 필터 초기화 버튼
-        if st.button("초기화", key="reset_filters", help="모든 필터 초기화"):
+        if st.button("초기화", key="reset_filters"):
             # Session state 초기화
             st.cache_data.clear()  
             st.session_state.date_filter = None
@@ -162,11 +162,6 @@ def render_feed_tab():
             st.session_state.limit_filter
             st.rerun()
 
-    with col_refresh:
-        # 새로고침 버튼 
-        if st.button("refresh"):
-            st.cache_data.clear()
-            st.rerun()
 
     col1, col2 = st.columns(2)
 

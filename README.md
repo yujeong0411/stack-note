@@ -14,6 +14,14 @@
 
 ## ✨ 주요 기능 (Features)
 
+### 🔒 100% 로컬 저장 - 당신의 데이터는 당신 것입니다
+
+- **모든 데이터는 PC에만 저장** (SQLite + ChromaDB)
+- **클라우드 업로드 없음** - 인터넷 없이도 작동
+- **API 키도 로컬 관리** - 외부 유출 걱정 없음
+
+### 핵심 기능
+
 Stacknote는 다음 핵심 기능을 통해 지식 관리를 자동화합니다.
 
 - 🔗 **자동 URL 수집 & 비동기 처리**  
@@ -148,7 +156,7 @@ stacknote/
 ├── app.py                # Streamlit main application
 ├── api.py                # Flask-based API server
 ├── run_desktop.py        # Desktop launcher script
-├── run_desktop.spec      # PyInstaller configuration spec for building the executable
+├── stack-note.spec       # PyInstaller configuration spec for building the executable
 ├── core/                 # Core functionality
 │   ├── extractor.py      # Content extraction
 │   ├── agent.py          # AI agent workflow
@@ -196,6 +204,14 @@ cp .env.example .env
 # Edit .env and add your UPSTAGE_API_KEY
 ```
 
+### 3. 브라우저 확장 설치
+
+#### Option A: 직접 설치 (개발/테스트용)
+1. Chrome에서 `chrome://extensions/` 접속
+2. "개발자 모드" 활성화
+3. "압축해제된 확장 프로그램을 로드합니다" 클릭
+4. `extension/` 폴더 선택
+
 ### 4. 실행 (Run)
 ```bash
 # Using uv
@@ -206,6 +222,22 @@ python -m streamlit run app.py
 ```
 
 브라우저에서 http://localhost:8501로 접속합니다.
+
+---
+
+## 📦 빌드 (Building Executable)
+
+데스크톱 실행 파일(.exe/.app)을 만들려면:
+```bash
+# 빌드 실행
+uv run pyinstaller stacknote.spec
+
+# 결과물
+dist/Stacknote.exe  # Windows
+dist/Stacknote.app  # Mac
+```
+
+빌드된 파일은 다른 PC에서도 Python 설치 없이 실행 가능합니다.
 
 ---
 
